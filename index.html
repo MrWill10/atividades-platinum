@@ -657,7 +657,7 @@ window.toggleAct = async id=>{
   const a=DB.activities.find(x=>x.id===id); if(!a) return;
   setSyncing('syncing');
   try {
-    await updateDoc(doc(db,'atividades',id),{ done:!a.done, updatedAt:serverTimestamp() });
+    await update(ref(db,'atividades/'+id),{ done:!a.done });
     toast((!a.done)?'✓ Atividade concluída!':'Atividade reaberta',(!a.done)?'ok':'');
     setSyncing('ok');
   } catch(e){ setSyncing('err'); toast('Erro: '+e.message,'err'); }
@@ -671,11 +671,10 @@ window.addAct = async (aid,cid)=>{
   const id=genId();
   setSyncing('syncing');
   try {
-    await setDoc(doc(db,'atividades',id),{
+    await set(ref(db,'atividades/'+id),{
       id, aid, cid, name, date,
       mesRef: date.slice(0,7),
-      done:false, dateEdited:false, originalDate:null,
-      updatedAt:serverTimestamp()
+      done:false, dateEdited:false, originalDate:null
     });
     ni.value=''; nd.value='';
     toast('Atividade adicionada!','ok');
@@ -686,7 +685,7 @@ window.addAct = async (aid,cid)=>{
 window.deleteAct = async id=>{
   if(!confirm('Excluir esta atividade?')) return;
   setSyncing('syncing');
-  try { await deleteDoc(doc(db,'atividades',id)); toast('Atividade removida'); setSyncing('ok'); }
+  try { await remove(ref(db,'atividades/'+id)); toast('Atividade removida'); setSyncing('ok'); }
   catch(e){ setSyncing('err'); toast('Erro: '+e.message,'err'); }
 };
 
@@ -706,9 +705,9 @@ window.confirmEditDate = async id=>{
   if(!act||inp.value===act.date){ cancelEditDate(id); return; }
   setSyncing('syncing');
   try {
-    const upd={ date:inp.value, mesRef:inp.value.slice(0,7), dateEdited:true, updatedAt:serverTimestamp() };
+    const upd={ date:inp.value, mesRef:inp.value.slice(0,7), dateEdited:true };
     if(!act.dateEdited) upd.originalDate=act.date;
-    await updateDoc(doc(db,'atividades',id), upd);
+    await update(ref(db,'atividades/'+id), upd);
     toast('📅 Data atualizada','info'); setSyncing('ok');
   } catch(e){ setSyncing('err'); toast('Erro: '+e.message,'err'); }
   cancelEditDate(id);
@@ -721,9 +720,9 @@ window.deleteCo = async (aid,cid)=>{
   a.companies=(a.companies||[]).filter(c=>c.id!==cid);
   setSyncing('syncing');
   try {
-    await updateDoc(doc(db,'analistas',aid),{ companies:a.companies, updatedAt:serverTimestamp() });
+    await update(ref(db,'analistas/'+aid),{ companies:a.companies });
     const toDel=DB.activities.filter(x=>x.cid===cid&&inMonth(x.date));
-    await Promise.all(toDel.map(x=>deleteDoc(doc(db,'atividades',x.id))));
+    await Promise.all(toDel.map(x=>remove(ref(db,'atividades/'+x.id))));
     toast('Empresa removida'); setSyncing('ok');
   } catch(e){ setSyncing('err'); toast('Erro: '+e.message,'err'); }
 };
@@ -734,8 +733,8 @@ window.deleteAnalyst = async aid=>{
   setSyncing('syncing');
   try {
     const toDel=DB.activities.filter(x=>x.aid===aid);
-    await Promise.all(toDel.map(x=>deleteDoc(doc(db,'atividades',x.id))));
-    await deleteDoc(doc(db,'analistas',aid));
+    await Promise.all(toDel.map(x=>remove(ref(db,'atividades/'+x.id))));
+    await remove(ref(db,'analistas/'+aid));
     DB.analysts=DB.analysts.filter(x=>x.id!==aid);
     VIEW='all'; SEL=null;
     render(); toast('Analista removido'); setSyncing('ok');
@@ -765,7 +764,7 @@ window.saveAnalyst = async ()=>{
   const id='a'+genId();
   setSyncing('syncing');
   try {
-    await setDoc(doc(db,'analistas',id),{ id, name, color, companies:[], createdAt:serverTimestamp() });
+    await set(ref(db,'analistas/'+id),{ id, name, color, companies:[] });
     DB.analysts.push({ id, name, color, companies:[] });
     closeModal(); showAnalyst(id); toast('Analista cadastrado!','ok'); setSyncing('ok');
   } catch(e){ setSyncing('err'); toast('Erro: '+e.message,'err'); }
@@ -787,7 +786,7 @@ window.saveCo = async aid=>{
   a.companies=[...(a.companies||[]),newCo];
   setSyncing('syncing');
   try {
-    await updateDoc(doc(db,'analistas',aid),{ companies:a.companies, updatedAt:serverTimestamp() });
+    await update(ref(db,'analistas/'+aid),{ companies:a.companies });
     closeModal(); render(); toast('Empresa cadastrada!','ok'); setSyncing('ok');
   } catch(e){ setSyncing('err'); toast('Erro: '+e.message,'err'); }
 };
@@ -826,7 +825,7 @@ window.execReplicate = async ()=>{
       const day=new Date(o.date+'T00:00:00').getDate(), last=new Date(dy,dm+1,0).getDate();
       const nd=`${dy}-${String(dm+1).padStart(2,'0')}-${String(Math.min(day,last)).padStart(2,'0')}`;
       const id=genId();
-      return setDoc(doc(db,'atividades',id),{ id, aid:o.aid, cid:o.cid, name:o.name, date:nd, mesRef:`${dy}-${String(dm+1).padStart(2,'0')}`, done:false, dateEdited:false, originalDate:null, updatedAt:serverTimestamp() });
+      return set(ref(db,'atividades/'+id),{ id, aid:o.aid, cid:o.cid, name:o.name, date:nd, mesRef:`${dy}-${String(dm+1).padStart(2,'0')}`, done:false, dateEdited:false, originalDate:null });
     }));
     closeModal(); CY=dy; CM=dm;
     await subscribeActivities();
