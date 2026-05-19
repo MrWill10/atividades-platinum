@@ -418,12 +418,12 @@ function setSyncing(s) {
 async function loadAll() {
   setSyncing('syncing');
   try {
-    // Analistas
-    const aSnap = await getDocs(collection(db, 'analistas'));
-    DB.analysts = aSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Analistas - Realtime Database
+    const aSnap = await get(ref(db, 'analistas'));
+    DB.analysts = aSnap.val() || {};
 
     // Atividades do mês em tempo real
-    await subscribeActivities();
+    subscribeActivities();
     setSyncing('ok');
   } catch(e) {
     setSyncing('err');
@@ -431,12 +431,17 @@ async function loadAll() {
   }
 }
 
-async function subscribeActivities() {
+function subscribeActivities() {
   if (unsubActs) unsubActs();
   const mes = `${CY}-${String(CM+1).padStart(2,'0')}`;
-  const q   = query(collection(db, 'atividades'), where('mesRef','==', mes));
-  unsubActs = onSnapshot(q, snap => {
-    DB.activities = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const actsRef = ref(db, 'atividades');
+  unsubActs = onValue(actsRef, snap => {
+    const all = snap.val() || {};
+    DB.activities = {};
+    Object.entries(all).forEach(([k,v]) => {
+      if (v && v.mesRef === mes) DB.activities[k] = v;
+    });
+    setSyncing('ok');
     render();
   }, err => { setSyncing('err'); console.error(err); });
 }
